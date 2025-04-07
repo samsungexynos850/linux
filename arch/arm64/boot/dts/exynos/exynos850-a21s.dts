@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2025, Thomas Turner <thomas_turner@talktalk.net>
+ */
+
+/dts-v1/;
+
+#include "exynos850.dtsi"
+#include "exynos850-pinctrl.dtsi"
+
+/ {
+	model = "Samsung Galaxy A21s";
+	compatible = "samsung,a21s", "samsung,a21s";
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x90000000 0x60000000>;
+	};
+
+	chosen {
+		bootargs = "earlycon=simplefb,0xCA000000,720x1600x32 console=simplefb";
+	};
+
+};
