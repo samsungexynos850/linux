@@ -309,13 +309,6 @@
 		};
 	};
 
-	rtcclk: rtc@11A30000 {
-		compatible = "samsung,exynos8-rtc";
-		reg = <0x00 0x11a30000 0x100>;
-		interrupts = <0x00 0x39 0x04 0x00 0x3a 0x04>;
-		#clock-cells = <0x01>;
-	};
-
 	fixed-rate-clocks {
 		oscclk {
 			compatible = "samsung,exynos3830-oscclk";
@@ -330,15 +323,6 @@
 		use-clocksource-only;
 		use-physical-timer;
 	};
-};
-
-&cmu_hsi {
-	clocks = <&oscclk>, <&rtcclk>,
-		 <&cmu_top CLK_DOUT_HSI_BUS>,
-		 <&cmu_top CLK_DOUT_HSI_MMC_CARD>,
-		 <&cmu_top CLK_DOUT_HSI_USB20DRD>;
-	clock-names = "oscclk", "rtcclk", "dout_hsi_bus",
-		      "dout_hsi_mmc_card", "dout_hsi_usb20drd";
 };
 
 &mmc_0 {
@@ -403,5 +387,13 @@
 };
 
 &watchdog_cl1 {
+	status = "okay";
+};
+
+&usbdrd {
+	status = "okay";
+};
+
+&usbdrd_phy {
 	status = "okay";
 };
