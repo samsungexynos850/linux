@@ -1,0 +1,407 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung Galaxy A21s (A217F) board device tree source
+ */
+
+/dts-v1/;
+
+#include "exynos850.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Samsung Galaxy A21s (A217F)";
+	compatible = "samsung,a217f", "samsung,exynos850";
+
+	aliases {
+		serial0 = &serial_0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		bootargs = "earlycon";
+
+		linux,initrd-start = <0x0 0x82000000>;
+		linux,initrd-end = <0x0 0x090000000>;
+
+		framebuffer0: framebuffer@fa000000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0xfa000000 0x0 (720 * 1600 * 4)>;
+			width = <720>;
+			height = <1600>;
+			stride = <(720 * 4)>;
+			format = "a8r8g8b8";
+		};
+	};
+
+	// TODO: samsung.
+	memory@8e0000000 {
+		device_type = "memory";
+		reg = <0x08 0xe0000000 0x20000000>;
+	};
+
+	memory@8c0000000 {
+		device_type = "memory";
+		reg = <0x08 0xc0000000 0x20000000>;
+	};
+
+	memory@8a0000000 {
+		device_type = "memory";
+		reg = <0x08 0xa0000000 0x20000000>;
+	};
+
+	memory@880000000 {
+		device_type = "memory";
+		reg = <0x08 0x80000000 0x20000000>;
+	};
+
+	memory@e0d00000 {
+		device_type = "memory";
+		reg = <0x00 0xe0d00000 0x1f300000>;
+	};
+
+	memory@c0000000 {
+		device_type = "memory";
+		reg = <0x00 0xc0000000 0x20000000>;
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x00 0x80000000 0x3c900000>;
+	};
+
+	// TODO: samsung.
+	reserved-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x01>;
+		ranges;
+
+		ion_crypto {
+			compatible = "exynos9820-ion";
+			size = <0x2000000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "crypto_heap";
+			ion,reusable;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_video_fw {
+			compatible = "exynos9820-ion";
+			size = <0x400000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "vfw_heap";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x02>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_video_stream {
+			compatible = "exynos9820-ion";
+			size = <0x1c00000>;
+			alloc-ranges = <0x00 0x40000000 0xc0000000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "vstream_heap";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x03>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_video_frame {
+			compatible = "exynos9820-ion";
+			size = <0x6800000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "vframe_heap";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x05>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_video_scaler {
+			compatible = "exynos9820-ion";
+			size = <0x2000000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "vscaler_heap";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x06>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_video_nfw {
+			compatible = "exynos9820-ion";
+			size = <0x400000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "vnfw_heap";
+			ion,reusable;
+			ion,protection_id = <0x07>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_ext_ui {
+			compatible = "exynos9820-ion";
+			size = <0x2000000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "ext_ui";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x0d>;
+			ion,alignment = <0x10000>;
+		};
+
+		ion_tui_buf {
+			compatible = "exynos9820-ion";
+			size = <0x2000000>;
+			alloc-ranges = <0x00 0x40000000 0xc0000000>;
+			alignment = <0x00 0x400000>;
+			ion,heapname = "tui_buf";
+			ion,secure;
+			ion,reusable;
+			ion,protection_id = <0x14>;
+			ion,alignment = <0x10000>;
+		};
+
+		el3mon_reserve {
+			compatible = "exynos,el3mon";
+			reg = <0x00 0xbff80000 0x80000>;
+		};
+
+		chub_rmem {
+			compatible = "exynos,chub_rmem";
+			reg = <0x00 0xfd000000 0x50000>;
+
+		};
+
+		sec_debug_magic {
+			compatible = "exynos,sec_debug_magic";
+			reg = <0x00 0x80000000 0x1000>;
+		};
+
+		debug_snapshot {
+			#address-cells = <0x02>;
+			#size-cells = <0x01>;
+
+			header {
+				compatible = "debug-snapshot,header";
+				reg = <0x00 0xf0000000 0x10000>;
+			};
+
+			log_kernel {
+				compatible = "debug-snapshot,log_kernel";
+				reg = <0x00 0xf0010000 0x200000>;
+			};
+
+			log_platform {
+				compatible = "debug-snapshot,log_platform";
+				reg = <0x00 0xf0210000 0x400000>;
+			};
+
+			log_sfr {
+				compatible = "debug-snapshot,log_sfr";
+				reg = <0x00 0xf0610000 0x100000>;
+			};
+
+			log_arrdumpreset {
+				compatible = "debug-snapshot,log_arrdumpreset";
+				reg = <0x00 0xf0710000 0x400000>;
+			};
+
+			log_bcm {
+				compatible = "debug-snapshot,log_bcm";
+				reg = <0x00 0xf0b10000 0x400000>;
+			};
+
+			log_pstore {
+				compatible = "debug-snapshot,log_pstore";
+				reg = <0x00 0xf0f10000 0x8000>;
+			};
+
+			log_kevents {
+				compatible = "debug-snapshot,log_kevents";
+				reg = <0x00 0xf0f18000 0x800000>;
+			};
+
+			log_fatal {
+				compatible = "debug-snapshot,log_fatal";
+				reg = <0x00 0xf1718000 0x400000>;
+			};
+		};
+
+		wifibt_if {
+			compatible = "exynos,wifibt_if";
+			size = <0xc00000>;
+		};
+
+		teegris_rmem {
+			compatible = "exynos,teegris_rmem";
+			reg = <0x00 0xed310000 0x2000>;
+
+		};
+
+		cp_rmem {
+			compatible = "exynos,modem_if";
+			reg = <0x00 0xd0000000 0x8800000>;
+			rmem_index = <0x00>;
+		};
+
+		gnss_rmem {
+			compatible = "samsung,exynos-gnss";
+			reg = <0x00 0xee000000 0x600000>;
+		};
+
+		seclog_mem {
+			compatible = "exynos,seclog";
+			reg = <0x00 0xc3000000 0x80000>;
+		};
+
+		abox_dbg@E9400000 {
+			compatible = "exynos,abox_dbg";
+			reg = <0x00 0xec000000 0x400000>;
+		};
+
+		abox-slog {
+			compatible = "exynos,abox_slog";
+			reg = <0x00 0xe6c00000 0x2800000>;
+		};
+
+		camera_rmem {
+			compatible = "exynos,camera_rmem";
+			reg = <0x00 0xed210000 0x100000>;
+		};
+
+		bootloader_fb {
+			reg = <0x00 0xfa000000 (720 * 1600 * 4)>;
+			no-map;
+		};
+
+		secure_camera {
+			compatible = "exynos9820-ion";
+			ion,heapname = "secure_camera_heap";
+			reg = <0x00 0xe1900000 0x1520000>;
+			ion,secure;
+			ion,untouchable;
+			ion,protection_id = <0x0b>;
+			ion,alignment = <0x10000>;
+		};
+
+		camera_contig {
+			compatible = "exynos9820-ion";
+			ion,heapname = "camera_heap";
+			reg = <0x00 0xdb900000 0xb00000>;
+			ion,secure;
+			ion,protection_id = <0x0a>;
+			ion,alignment = <0x10000>;
+		};
+
+		secure_camera_ext {
+			compatible = "exynos9820-ion";
+			ion,heapname = "secure_camera_heap_drc";
+			reg = <0x00 0xe2e20000 0x780000>;
+			ion,secure;
+			ion,protection_id = <0x0e>;
+			ion,alignment = <0x10000>;
+		};
+	};
+
+	rtcclk: rtc@11A30000 {
+		compatible = "samsung,exynos8-rtc";
+		reg = <0x00 0x11a30000 0x100>;
+		interrupts = <0x00 0x39 0x04 0x00 0x3a 0x04>;
+		#clock-cells = <0x01>;
+	};
+
+	fixed-rate-clocks {
+		oscclk {
+			compatible = "samsung,exynos3830-oscclk";
+			clock-frequency = <0x18cba80>;
+		};
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <0x01 0x0d 0xff08 0x01 0x0e 0xff08 0x01 0x0b 0xff08 0x01 0x0a 0xff08>;
+		clock-frequency = <0x18cba80>;
+		use-clocksource-only;
+		use-physical-timer;
+	};
+};
+
+&cmu_hsi {
+	clocks = <&oscclk>, <&rtcclk>,
+		 <&cmu_top CLK_DOUT_HSI_BUS>,
+		 <&cmu_top CLK_DOUT_HSI_MMC_CARD>,
+		 <&cmu_top CLK_DOUT_HSI_USB20DRD>;
+	clock-names = "oscclk", "rtcclk", "dout_hsi_bus",
+		      "dout_hsi_mmc_card", "dout_hsi_usb20drd";
+};
+
+&mmc_0 {
+	status = "disabled";
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	cap-mmc-highspeed;
+	non-removable;
+	mmc-hs400-enhanced-strobe;
+	card-detect-delay = <200>;
+	clock-frequency = <800000000>;
+	bus-width = <8>;
+	samsung,dw-mshc-ciu-div = <3>;
+	samsung,dw-mshc-sdr-timing = <0 4>;
+	samsung,dw-mshc-ddr-timing = <2 4>;
+	samsung,dw-mshc-hs400-timing = <0 2>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&sd0_clk_pins &sd0_cmd_pins &sd0_rdqs_pins &sd0_nreset_pins
+		     &sd0_bus1_pins &sd0_bus4_pins &sd0_bus8_pins>;
+};
+
+&oscclk {
+	clock-frequency = <26000000>;
+};
+
+&pinctrl_alive {
+	key_voldown_pins: key-voldown-pins {
+		samsung,pins = "gpa1-0";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+	};
+
+	key_volup_pins: key-volup-pins {
+		samsung,pins = "gpa0-7";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+	};
+
+	micro_usb_det_pins: micro-usb-det-pins {
+		samsung,pins = "gpa0-0";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+	};
+};
+
+&serial_0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pins>;
+};
+
+&usi_uart {
+	samsung,clkreq-on; /* needed for UART mode */
+	status = "okay";
+};
+
+&watchdog_cl0 {
+	status = "okay";
+};
+
+&watchdog_cl1 {
+	status = "okay";
+};
