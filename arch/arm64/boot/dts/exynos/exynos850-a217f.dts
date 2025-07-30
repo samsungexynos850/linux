@@ -370,5 +370,4 @@
 	dr_mode = "otg";
 	phy-names = "usb2-phy", "usb3-phy";
 	usb-role-switch;
-	role-switch-default-mode = "host";
 };
