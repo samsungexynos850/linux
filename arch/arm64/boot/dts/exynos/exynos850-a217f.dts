@@ -21,7 +21,7 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 		#address-cells = <2>;
-		#size-cells = <2>;
+		#size-cells = <1>;
 		ranges;
 		bootargs = "earlycon";
 
@@ -30,7 +30,7 @@
 
 		framebuffer0: framebuffer@fa000000 {
 			compatible = "simple-framebuffer";
-			reg = <0x0 0xfa000000 0x0 (720 * 1600 * 4)>;
+			reg = <0x0 0xfa000000 (720 * 1600 * 4)>;
 			width = <720>;
 			height = <1600>;
 			stride = <(720 * 4)>;
@@ -339,28 +339,6 @@
 	clock-frequency = <26000000>;
 };
 
-&pinctrl_alive {
-	key_voldown_pins: key-voldown-pins {
-		samsung,pins = "gpa1-0";
-		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
-		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
-	};
-
-	key_volup_pins: key-volup-pins {
-		samsung,pins = "gpa0-7";
-		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
-		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
-	};
-
-	micro_usb_det_pins: micro-usb-det-pins {
-		samsung,pins = "gpa0-0";
-		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
-		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-	};
-};
-
 &serial_0 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -391,4 +369,6 @@
 &usbdrd_dwc3 {
 	dr_mode = "otg";
 	phy-names = "usb2-phy", "usb3-phy";
+	usb-role-switch;
+	role-switch-default-mode = "host";
 };
