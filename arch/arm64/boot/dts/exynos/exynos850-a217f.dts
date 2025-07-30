@@ -309,20 +309,6 @@
 		};
 	};
 
-	fixed-rate-clocks {
-		oscclk {
-			compatible = "samsung,exynos3830-oscclk";
-			clock-frequency = <0x18cba80>;
-		};
-	};
-
-	timer {
-		compatible = "arm,armv8-timer";
-		interrupts = <0x01 0x0d 0xff08 0x01 0x0e 0xff08 0x01 0x0b 0xff08 0x01 0x0a 0xff08>;
-		clock-frequency = <0x18cba80>;
-		use-clocksource-only;
-		use-physical-timer;
-	};
 };
 
 &mmc_0 {
@@ -346,6 +332,10 @@
 };
 
 &oscclk {
+	clock-frequency = <26000000>;
+};
+
+&timer {
 	clock-frequency = <26000000>;
 };
 
@@ -378,7 +368,6 @@
 };
 
 &usi_uart {
-	samsung,clkreq-on; /* needed for UART mode */
 	status = "okay";
 };
 
@@ -396,4 +385,10 @@
 
 &usbdrd_phy {
 	status = "okay";
+	pinctrl-names = "default";
+};
+
+&usbdrd_dwc3 {
+	dr_mode = "otg";
+	phy-names = "usb2-phy", "usb3-phy";
 };
