@@ -28,6 +28,7 @@
 
 	chosen {
 		stdout-path = &serial_0;
+		bootargs = "earlycon=simplefb,0x0FA000000,720x1600x32 console=simplefb";
 	};
 
 	connector {
