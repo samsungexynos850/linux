@@ -13,6 +13,9 @@ dtb-$(CONFIG_ARCH_EXYNOS) += \
 	exynos7870-j7xelte.dtb		\
 	exynos7870-on7xelte.dtb		\
 	exynos7885-jackpotlte.dtb	\
+	exynos850-a217f-3gb.dtb		\
+	exynos850-a217f-4gb.dtb		\
+	exynos850-a217f-6gb.dtb		\
 	exynos850-e850-96.dtb		\
 	exynos8895-dreamlte.dtb		\
 	exynos9810-starlte.dtb		\
