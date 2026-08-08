@@ -96,6 +96,10 @@
 		      "dout_hsi_mmc_card", "dout_hsi_usb20drd";
 };
 
+&gpu {
+	status = "okay";
+};
+
 &mmc_0 {
 	status = "okay";
 	compatible = "samsung,exynos7-dw-mshc";
