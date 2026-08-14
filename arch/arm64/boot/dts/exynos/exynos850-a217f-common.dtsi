@@ -53,6 +53,13 @@
 		regulator-name = "dummy_reg";
 	};
 
+	reg_mali: regulator-1 {
+		compatible = "regulator-fixed";
+		regulator-name = "mali";
+		regulator-min-microvolt = <1150000>;
+		regulator-max-microvolt = <1150000>;
+	};
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <1>;
@@ -97,6 +104,7 @@
 };
 
 &gpu {
+	mali-supply = <&reg_mali>;
 	status = "okay";
 };
 
