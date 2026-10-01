@@ -126,10 +126,15 @@ static const struct resource s2mpu12_rtc_resources[] = {
         DEFINE_RES_IRQ_NAMED(S2MPU12_IRQ_RTCA0, "alarm"),
 };
 
+static const struct resource s2mpu12_pwrkey_resources[] = {
+	DEFINE_RES_IRQ_NAMED(S2MPU12_IRQ_PWRONR, "pwronr"),
+	DEFINE_RES_IRQ_NAMED(S2MPU12_IRQ_PWRONF, "pwronf"),
+};
+
 static const struct mfd_cell s2mpu12_devs[] = {
         MFD_CELL_NAME("s2mpu12-regulator"),
+	MFD_CELL_RES("s2mpu12-power-keys", s2mpu12_pwrkey_resources),
         MFD_CELL_RES("s2mpu12-rtc", s2mpu12_rtc_resources),
-        MFD_CELL_OF("s2mpu12-power-keys", NULL, NULL, 0, 0, "samsung,s2mpu12-keys"),
 };
 
 static void sec_pmic_dump_rev(struct sec_pmic_dev *sec_pmic)
