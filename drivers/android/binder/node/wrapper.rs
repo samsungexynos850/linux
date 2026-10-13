@@ -20,8 +20,10 @@ impl CritIncrWrapper {
     }
 
     pub(super) fn init(self, node: DArc<Node>) -> DLArc<dyn DeliverToRead> {
-        let Ok(initialized) = self.inner.pin_init_with(DTRWrap::new(NodeWrapper { node }));
-        ListArc::from(initialized) as DLArc<dyn DeliverToRead>
+        match self.inner.pin_init_with(DTRWrap::new(NodeWrapper { node })) {
+            Ok(initialized) => ListArc::from(initialized) as DLArc<dyn DeliverToRead>,
+            Err(err) => match err {},
+        }
     }
 }
 
@@ -94,7 +96,7 @@ impl DeliverToRead for NodeWrapper {
     }
 
     #[inline(never)]
-    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str) -> Result {
+    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
         seq_print!(
             m,
             "{}node work {}: u{:016x} c{:016x}\n",
