@@ -20,7 +20,6 @@ use crate::{
     defs::*,
     node::{Node, NodeRef},
     process::Process,
-    trace::trace_transaction_failed_buffer_release,
     DArc,
 };
 
@@ -209,7 +208,7 @@ impl Allocation {
         let num_close_on_free = files.iter().filter(|entry| entry.close_on_free).count();
         let mut close_on_free = KVec::with_capacity(num_close_on_free, GFP_KERNEL)?;
 
-        let mut reservations = KVVec::with_capacity(files.len(), GFP_KERNEL)?;
+        let mut reservations = KVec::with_capacity(files.len(), GFP_KERNEL)?;
         for file_info in files {
             let res = FileDescriptorReservation::get_unused_fd_flags(bindings::O_CLOEXEC)?;
             let fd = res.reserved_fd();
@@ -262,7 +261,7 @@ impl Drop for Allocation {
                 let view = AllocationView::new(self, offsets.start);
                 for i in offsets.step_by(size_of::<u64>()) {
                     if view.cleanup_object(i).is_err() {
-                        pr_warn_ratelimited!("Error cleaning up object at offset {}\n", i)
+                        pr_warn!("Error cleaning up object at offset {}\n", i)
                     }
                 }
             }
@@ -287,7 +286,7 @@ impl Drop for Allocation {
 
             if info.clear_on_free {
                 if let Err(e) = self.fill_zero() {
-                    pr_warn_ratelimited!("Failed to clear data on free: {:?}\n", e);
+                    pr_warn!("Failed to clear data on free: {:?}", e);
                 }
             }
         }
@@ -323,12 +322,6 @@ impl core::ops::Deref for NewAllocation {
 impl core::ops::DerefMut for NewAllocation {
     fn deref_mut(&mut self) -> &mut Allocation {
         &mut self.0
-    }
-}
-
-impl Drop for NewAllocation {
-    fn drop(&mut self) {
-        trace_transaction_failed_buffer_release(self.debug_id);
     }
 }
 
@@ -510,7 +503,7 @@ impl BinderObject {
     /// The closure should write the bytes for the object into the provided slice.
     pub(crate) fn read_from_inner<R>(reader: R) -> Result<BinderObject>
     where
-        R: FnOnce(&mut [u8; size_of::<BinderObject>()]) -> Result,
+        R: FnOnce(&mut [u8; size_of::<BinderObject>()]) -> Result<()>,
     {
         let mut obj = MaybeUninit::<BinderObject>::zeroed();
 
@@ -574,7 +567,7 @@ impl BinderObject {
 
 #[derive(Default)]
 struct FileList {
-    files_to_translate: KVVec<FileEntry>,
+    files_to_translate: KVec<FileEntry>,
     close_on_free: KVec<u32>,
 }
 
@@ -588,7 +581,7 @@ struct FileEntry {
 }
 
 pub(crate) struct TranslatedFds {
-    reservations: KVVec<Reservation>,
+    reservations: KVec<Reservation>,
     /// If commit is called, then these fds should be closed. (If commit is not called, then they
     /// shouldn't be closed.)
     close_on_free: FdsCloseOnFree,
@@ -602,7 +595,7 @@ struct Reservation {
 impl TranslatedFds {
     pub(crate) fn new() -> Self {
         Self {
-            reservations: KVVec::new(),
+            reservations: KVec::new(),
             close_on_free: FdsCloseOnFree(KVec::new()),
         }
     }
