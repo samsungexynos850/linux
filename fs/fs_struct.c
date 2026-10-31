@@ -178,10 +178,11 @@ EXPORT_SYMBOL_GPL(unshare_fs_struct);
  * state into an implicitly pinned directory somewhere. Calling random
  * binaries in the old rootfs via usermodehelpers.
  *
- * Be aggressive about this: We simply reject operating on stale
- * fs_struct state by reverting to nullfs. Every kworker that does
- * lookups after this point will fail. Every usermodehelper call will
- * fail. Tough luck but let's be kind and emit a warning to userspace.
+ * Upstream reverts the stale fs_struct state to nullfs here. Android's
+ * init unshares CLONE_NEWNS from PID 1 while its property service thread
+ * still shares that fs_struct, so every lookup from that thread would
+ * fail with -ENOENT (SELinux access checks, persistent properties).
+ * Keep the old behaviour and only warn.
  */
 static inline void validate_fs_switch(struct fs_struct *old_fs)
 {
@@ -193,8 +194,6 @@ static inline void validate_fs_switch(struct fs_struct *old_fs)
 	if (old_fs != userspace_init_fs)
 		return;
 	pr_warn("VFS: Pid 1 stopped sharing filesystem state\n");
-	set_fs_root(userspace_init_fs, &init_fs.root);
-	set_fs_pwd(userspace_init_fs, &init_fs.root);
 }
 
 struct fs_struct *switch_fs_struct(struct fs_struct *new_fs)
