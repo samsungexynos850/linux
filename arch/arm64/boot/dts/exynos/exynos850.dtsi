@@ -475,6 +475,15 @@
 				mask = <0x2>; /* SWRESET_SYSTEM */
 				value = <0x2>; /* reset value */
 			};
+
+			reboot-mode {
+				compatible = "syscon-reboot-mode";
+				offset = <0x080c>;
+				mode-normal = <0x12345600>;
+				mode-download = <0x12345601>;
+				mode-bootloader = <0x1234560d>;
+				mode-recovery = <0x12345604>;
+			};
 		};
 
 		watchdog_cl0: watchdog@10050000 {
