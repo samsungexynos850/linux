@@ -19,6 +19,8 @@
 		#address-cells = <2>;
 		#size-cells = <1>;
 
+		bootargs = "androidboot.hardware=exynos850 androidboot.boot_devices=soc@0/12100000.mmc androidboot.selinux=permissive androidboot.verifiedbootstate=orange androidboot.init_fatal_reboot_target=recovery firmware_class.path=/vendor/firmware/ log_buf_len=4M loop.max_part=7 printk.devkmsg=on rw console=tty0 ignore_loglevel loglevel=8";
+
 		framebuffer0: framebuffer@fa000000 {
 			compatible = "simple-framebuffer";
 			reg = <0x0 0xfa000000 (720 * 1600 * 4)>;
