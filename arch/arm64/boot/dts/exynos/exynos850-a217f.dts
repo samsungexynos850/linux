@@ -101,6 +101,18 @@
 			pmsg-size = <0x20000>;
 		};
 
+		/*
+		 * Without the DPU IOMMU, scanout buffers are physically
+		 * contiguous, and the DECON only takes 32-bit addresses
+		 */
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x10000000>;
+			alloc-ranges = <0x0 0x80000000 0x80000000>;
+			linux,cma-default;
+		};
+
 		cont_splash_mem: framebuffer@fa000000 {
 			reg = <0x0 0xfa000000 (720 * 1600 * 4)>;
 			no-map;
