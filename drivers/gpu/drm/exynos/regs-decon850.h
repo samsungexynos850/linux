@@ -72,7 +72,6 @@
 
 #define DECON_DATA_PATH_CONTROL_1		0x0218
 #define WIN_CHMAP(_w, _ch)			(((_ch) & 0x7) << (4 * (_w)))
-#define WIN_CHMAP_MASK(_w)			(0x7 << (4 * (_w)))
 
 #define DECON_DATA_PATH_CONTROL_2		0x0230
 /* No compression, frame FIFO 0 -> formatter 0 -> DSIM interface 0 */

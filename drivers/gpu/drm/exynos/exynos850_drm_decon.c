@@ -3,9 +3,10 @@
  * Exynos850 DECON (display controller) driver.
  *
  * The DECON blends up to four windows and feeds the result to the DSIM. Each
- * window is fetched from memory by one DPU_DMA (IDMA) channel. Only the
- * graphics (G) channels are used for now; the VG channel additionally routes
- * through a DPP for scaling and colour conversion, which is not supported.
+ * window is fetched from memory by one DPU_DMA (IDMA) channel. Only the three
+ * graphics (G) channels are used, one per window, so the planes have a fixed
+ * order. The VG channel additionally routes through a DPP for colour
+ * conversion, which is not supported. None of the channels can scale.
  */
 
 #include <linux/clk.h>
@@ -16,6 +17,8 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_framebuffer.h>
@@ -28,8 +31,10 @@
 #include "exynos_drm_plane.h"
 #include "regs-decon850.h"
 
-#define DECON_WINDOWS_NR	1
+#define DECON_WINDOWS_NR	3
 #define DECON_PRIMARY_WIN	0
+/* The fourth window has no G channel left and stays off */
+#define DECON_HW_WINDOWS_NR	4
 
 /* Register offsets of the DPU_DMA channels from the start of the DMA block */
 #define IDMA_CH_VG0_OFFSET	0x4000
@@ -45,13 +50,19 @@
 
 #define DECON_RUN_TIMEOUT_US	20000
 
+/* Smallest window an IDMA channel fetches */
+#define DECON_WIN_MIN_SIZE	16
+
 struct decon850_win {
 	unsigned int ch;
 	unsigned int dma_offset;
 };
 
+/* Ordered bottom to top: DECON blends a window over the ones below it. */
 static const struct decon850_win decon850_wins[DECON_WINDOWS_NR] = {
 	[DECON_PRIMARY_WIN] = { .ch = DECON_CH_G1, .dma_offset = IDMA_CH_G1_OFFSET },
+	{ .ch = DECON_CH_G0, .dma_offset = IDMA_CH_G0_OFFSET },
+	{ .ch = DECON_CH_G2, .dma_offset = IDMA_CH_G2_OFFSET },
 };
 
 struct decon850_context {
@@ -177,6 +188,20 @@ static void decon850_idma_init(struct decon850_context *ctx, unsigned int win)
 	idma_set_bits(ctx, win, IDMA_OUT_CON, IDMA_OUT_FRAME_ALPHA_MASK,
 		      IDMA_OUT_FRAME_ALPHA(0xff));
 	idma_set_bits(ctx, win, IDMA_IN_CON, IDMA_BLOCK_EN, 0);
+}
+
+static void decon850_set_chmap(struct decon850_context *ctx)
+{
+	u32 val = 0;
+	unsigned int win;
+
+	for (win = 0; win < DECON_WINDOWS_NR; win++)
+		val |= WIN_CHMAP(win, decon850_wins[win].ch);
+	/* Point the unused window at the remaining channel, not a used one. */
+	for (; win < DECON_HW_WINDOWS_NR; win++)
+		val |= WIN_CHMAP(win, DECON_CH_VG0);
+
+	decon_write(ctx, DECON_DATA_PATH_CONTROL_1, val);
 }
 
 static void decon850_set_size(struct decon850_context *ctx,
@@ -376,8 +401,6 @@ static void decon850_update_plane(struct exynos_drm_crtc *crtc,
 	decon_write(ctx, DECON_WIN_START_TIME_CONTROL(win), 0);
 	decon850_win_set_blend(ctx, win, &state->base);
 
-	decon_set_bits(ctx, DECON_DATA_PATH_CONTROL_1, WIN_CHMAP_MASK(win),
-		       WIN_CHMAP(win, decon850_wins[win].ch));
 	decon_set_bits(ctx, DECON_DATA_PATH_CONTROL_0,
 		       WIN_EN(win) | WIN_MAPCOLOR_EN(win), WIN_EN(win));
 }
@@ -468,6 +491,7 @@ static void decon850_atomic_enable(struct exynos_drm_crtc *crtc)
 
 	/* Windows not managed here may still be on from the bootloader. */
 	decon_write(ctx, DECON_DATA_PATH_CONTROL_0, 0);
+	decon850_set_chmap(ctx);
 
 	decon_write(ctx, DECON_EXTRA_INTERRUPT_ENABLE,
 		    DPU_TIME_OUT_INT_EN | DPU_RESOURCE_CONFLICT_INT_EN);
@@ -506,11 +530,42 @@ static void decon850_atomic_disable(struct exynos_drm_crtc *crtc)
 	pm_runtime_put_sync(ctx->dev);
 }
 
+static int decon850_atomic_check(struct exynos_drm_crtc *crtc,
+				 struct drm_crtc_state *crtc_state)
+{
+	struct decon850_context *ctx = crtc->ctx;
+	const struct drm_plane_state *plane_state;
+	struct drm_plane *plane;
+
+	drm_atomic_crtc_state_for_each_plane_state(plane, plane_state,
+						   crtc_state) {
+		const struct exynos_drm_plane_state *state =
+			container_of(plane_state,
+				     const struct exynos_drm_plane_state, base);
+
+		if (!plane_state->fb)
+			continue;
+
+		if (state->src.w < DECON_WIN_MIN_SIZE ||
+		    state->src.h < DECON_WIN_MIN_SIZE) {
+			drm_dbg_atomic(ctx->drm_dev,
+				       "[PLANE:%d] %ux%u is below the %ux%u minimum\n",
+				       plane->base.id, state->src.w,
+				       state->src.h, DECON_WIN_MIN_SIZE,
+				       DECON_WIN_MIN_SIZE);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
 static const struct exynos_drm_crtc_ops decon850_crtc_ops = {
 	.atomic_enable		= decon850_atomic_enable,
 	.atomic_disable		= decon850_atomic_disable,
 	.enable_vblank		= decon850_enable_vblank,
 	.disable_vblank		= decon850_disable_vblank,
+	.atomic_check		= decon850_atomic_check,
 	.update_plane		= decon850_update_plane,
 	.disable_plane		= decon850_disable_plane,
 	.atomic_flush		= decon850_atomic_flush,
