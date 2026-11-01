@@ -88,9 +88,13 @@
 		#address-cells = <2>;
 		#size-cells = <1>;
 
-		ramoops@f0000000 {
+		/*
+		 * S-Boot rewrites its debug snapshot header at 0xf0000000
+		 * (ess_setup), but keeps the kernel log area after it intact
+		 */
+		ramoops@f0010000 {
 			compatible = "ramoops";
-			reg = <0x0 0xf0000000 0x200000>;
+			reg = <0x0 0xf0010000 0x200000>;
 			record-size = <0x20000>;
 			console-size = <0x20000>;
 			ftrace-size = <0x100000>;
