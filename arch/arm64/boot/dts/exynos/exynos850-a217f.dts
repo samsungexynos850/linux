@@ -365,6 +365,48 @@
 		      "dout_hsi_mmc_card", "dout_hsi_usb20drd";
 };
 
+&decon {
+	status = "okay";
+};
+
+&dsi {
+	samsung,burst-clock-frequency = <830000000>;
+	samsung,esc-clock-frequency = <20000000>;
+	status = "okay";
+
+	panel@0 {
+		compatible = "syna,td4150-panel";
+		reg = <0>;
+
+		/*
+		 * TODO: Use vdd_ldo28 once the S2MPU12 regulators are
+		 * supported, and add vsn-supply, vsp-supply and
+		 * backlight-gpios (gpg2 1) once the LM36274 bias and
+		 * backlight driver is described. Until then the panel
+		 * supplies keep the configuration of the bootloader.
+		 */
+		vio-supply = <&reg_dummy>;
+		reset-gpios = <&gpg2 4 GPIO_ACTIVE_LOW>;
+
+		width-mm = <69>;
+		height-mm = <152>;
+
+		panel-timing {
+			clock-frequency = <128118000>;
+
+			hactive = <720>;
+			hfront-porch = <508>;
+			hsync-len = <2>;
+			hback-porch = <80>;
+
+			vactive = <1600>;
+			vfront-porch = <24>;
+			vsync-len = <2>;
+			vback-porch = <4>;
+		};
+	};
+};
+
 &gpu {
 	mali-supply = <&reg_dummy>;
 
