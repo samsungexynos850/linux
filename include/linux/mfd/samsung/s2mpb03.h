@@ -1,0 +1,45 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
+/*
+ * Copyright (c) 2016 Samsung Electronics Co., Ltd
+ * Copyright (c) 2026 schoosh212 <superaviation001@gmail.com>
+ */
+
+#ifndef __LINUX_MFD_S2MPB03_H
+#define __LINUX_MFD_S2MPB03_H
+
+#include <linux/bits.h>
+
+/* S2MPB03 registers */
+enum s2mpb03_reg {
+	S2MPB03_REG_PMIC_ID,
+	S2MPB03_REG_STATUS,
+	S2MPB03_REG_CTRL,
+	S2MPB03_REG_LDO1_CTRL,
+	S2MPB03_REG_LDO2_CTRL,
+	S2MPB03_REG_LDO3_CTRL,
+	S2MPB03_REG_LDO4_CTRL,
+	S2MPB03_REG_LDO5_CTRL,
+	S2MPB03_REG_LDO6_CTRL,
+	S2MPB03_REG_LDO7_CTRL,
+	S2MPB03_REG_LDO_SLEW1,
+	S2MPB03_REG_LDO_SLEW2,
+};
+
+/* S2MPB03 regulator ids */
+enum s2mpb03_regulators {
+	S2MPB03_LDO1,
+	S2MPB03_LDO2,
+	S2MPB03_LDO3,
+	S2MPB03_LDO4,
+	S2MPB03_LDO5,
+	S2MPB03_LDO6,
+	S2MPB03_LDO7,
+	S2MPB03_REGULATOR_MAX,
+};
+
+/* S2MPB03_REG_LDOx_CTRL */
+#define S2MPB03_LDO_ENABLE_MASK		BIT(7)
+#define S2MPB03_LDO_VSEL_MASK		GENMASK(5, 0)
+#define S2MPB03_LDO_N_VOLTAGES		(S2MPB03_LDO_VSEL_MASK + 1)
+
+#endif /* __LINUX_MFD_S2MPB03_H */
