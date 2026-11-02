@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/samsung,s2mpb03.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Samsung S2MPB03 Power Management IC
+
+maintainers:
+  - Thomas Turner <tturner@lineageos.org>
+
+description:
+  The Samsung S2MPB03 is a companion PMIC with 7 LDOs, connected over I2C.
+  Smartphones use it to power their cameras.
+
+properties:
+  compatible:
+    const: samsung,s2mpb03
+
+  reg:
+    maxItems: 1
+
+  regulators:
+    type: object
+    description:
+      List of child nodes that specify the regulators.
+
+    patternProperties:
+      "^ldo[1-7]$":
+        type: object
+        $ref: /schemas/regulator/regulator.yaml#
+        unevaluatedProperties: false
+
+    additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - regulators
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        pmic@56 {
+            compatible = "samsung,s2mpb03";
+            reg = <0x56>;
+
+            regulators {
+                ldo1 {
+                    regulator-name = "cam0_vldo1";
+                    regulator-min-microvolt = <1050000>;
+                    regulator-max-microvolt = <1050000>;
+                };
+
+                ldo5 {
+                    regulator-name = "cam0_vldo5";
+                    regulator-min-microvolt = <2800000>;
+                    regulator-max-microvolt = <2800000>;
+                };
+            };
+        };
+    };
