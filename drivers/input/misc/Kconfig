@@ -236,6 +236,16 @@ config INPUT_PMIC8XXX_PWRKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called pmic8xxx-pwrkey.
 
+config INPUT_S2MPU12_PWRKEY
+	tristate "Samsung S2MPU12 PMIC power key support"
+	depends on MFD_SEC_ACPM || COMPILE_TEST
+	help
+	  Say Y here if you want support for the power key connected to
+	  the Samsung S2MPU12 PMIC.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called s2mpu12-pwrkey.
+
 config INPUT_SPARCSPKR
 	tristate "SPARC Speaker support"
 	depends on PCI && SPARC64
