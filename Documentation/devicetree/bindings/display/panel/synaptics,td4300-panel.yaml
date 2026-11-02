@@ -16,6 +16,7 @@ properties:
   compatible:
     enum:
       - syna,td4101-panel
+      - syna,td4150-panel
       - syna,td4300-panel
 
   reg:
