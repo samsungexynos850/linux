@@ -167,6 +167,26 @@
 	status = "disabled";
 };
 
+&spi_1 {
+	cs-gpios = <&gpm3 0 GPIO_ACTIVE_LOW>;
+	num-cs = <1>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	status = "okay";
+
+	touchscreen@0 {
+		compatible = "syna,td4150-touchscreen";
+		reg = <0>;
+		interrupt-parent = <&gpa0>;
+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+		spi-max-frequency = <7000000>;
+		spi-cpha;
+		spi-cpol;
+		wakeup-source;
+	};
+};
+
 &timer {
 	/*
 	 * Non-updatable, broken stock Samsung bootloader does not
@@ -188,6 +208,11 @@
 };
 
 &usbdrd_phy {
+	status = "okay";
+};
+
+&usi_cmgp0 {
+	samsung,mode = <USI_MODE_SPI>;
 	status = "okay";
 };
 
