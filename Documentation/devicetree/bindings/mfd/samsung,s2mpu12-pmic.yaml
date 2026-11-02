@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/samsung,s2mpu12-pmic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Samsung S2MPU12 Power Management IC
+
+maintainers:
+  - Thomas Turner <tturner@lineageos.org>
+
+description: |
+  The Samsung S2MPU12 is the main Power Management IC (PMIC) for the Exynos850
+  SoC, with 5 buck converters, 36 LDOs, an RTC and a power key input. It also
+  contains the audio codec of the SoC.
+
+  It is reached through the ACPM firmware, so it is described as a child of
+  the ACPM IPC node.
+
+properties:
+  compatible:
+    const: samsung,s2mpu12-pmic
+
+  interrupts:
+    maxItems: 1
+
+  regulators:
+    type: object
+    description:
+      List of child nodes that specify the regulators.
+
+    patternProperties:
+      "^(buck[1-5]|ldo([1-9]|[12][0-9]|3[0-6]))$":
+        type: object
+        $ref: /schemas/regulator/regulator.yaml#
+        unevaluatedProperties: false
+
+    additionalProperties: false
+
+  system-power-controller: true
+
+  wakeup-source: true
+
+required:
+  - compatible
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+
+    pmic {
+        compatible = "samsung,s2mpu12-pmic";
+        interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+        system-power-controller;
+        wakeup-source;
+
+        regulators {
+            buck1 {
+                regulator-name = "vdd_cpu";
+                regulator-min-microvolt = <500000>;
+                regulator-max-microvolt = <1200000>;
+                regulator-always-on;
+            };
+        };
+    };
