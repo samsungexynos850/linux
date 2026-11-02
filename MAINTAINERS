@@ -27097,6 +27097,13 @@ F:	drivers/dma-buf/sync_*
 F:	include/linux/sync_file.h
 F:	include/uapi/linux/sync_file.h
 
+SYNAPTICS TD4150 TOUCHSCREEN DRIVER
+M:	Thomas Turner <tturner@lineageos.org>
+L:	linux-input@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/input/touchscreen/syna,td4150-touchscreen.yaml
+F:	drivers/input/touchscreen/ovt-td4150.c
+
 SYNOPSYS ARC ARCHITECTURE
 M:	Vineet Gupta <vgupta@kernel.org>
 L:	linux-snps-arc@lists.infradead.org

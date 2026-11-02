@@ -701,6 +701,19 @@ config TOUCHSCREEN_NOVATEK_NVT_TS
 	  To compile this driver as a module, choose M here: the
 	  module will be called novatek-nvt-ts.
 
+config TOUCHSCREEN_OVT_TD4150
+	tristate "Synaptics/OmniVision TD4150 touchscreen support"
+	depends on SPI
+	select CRC32
+	help
+	  Say Y here if you have the touch controller of a Synaptics TD4150
+	  TDDI chip, as found in the Samsung Galaxy A21s.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ovt-td4150.
+
 config TOUCHSCREEN_IMAGIS
 	tristate "Imagis touchscreen support"
 	depends on I2C
