@@ -69,7 +69,9 @@ properties:
 
     properties:
       compatible:
-        const: samsung,s2mpg10-pmic
+        enum:
+          - samsung,s2mpg10-pmic
+          - samsung,s2mpu12-pmic
 
   pmic-2:
     description: Child node describing the sub PMIC.
@@ -103,6 +105,10 @@ allOf:
       properties:
         clocks: false
         clock-names: false
+        pmic-1:
+          properties:
+            compatible:
+              const: samsung,s2mpg10-pmic
 
   - if:
       properties:
@@ -125,7 +131,10 @@ allOf:
               - cp
           uniqueItems: true
         pmic: false
-        pmic-1: false
+        pmic-1:
+          properties:
+            compatible:
+              const: samsung,s2mpu12-pmic
         pmic-2: false
       required:
         - clocks
