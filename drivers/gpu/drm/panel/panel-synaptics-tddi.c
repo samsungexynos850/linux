@@ -18,6 +18,11 @@
 #include <drm/drm_panel.h>
 #include <drm/drm_probe_helper.h>
 
+struct tddi_brightness_point {
+	u8 level;
+	u8 dcs;
+};
+
 struct tddi_panel_data {
 	u8 lanes;
 	/* additional DSI mode flags */
@@ -30,6 +35,14 @@ struct tddi_panel_data {
 	/* wait timings for panel disable */
 	u8 delay_ms_display_off;
 	u8 delay_ms_sleep_enter;
+	/*
+	 * optional curve from backlight levels to DCS brightness, sorted by
+	 * level and interpolated linearly; the levels map 1:1 without it
+	 */
+	const struct tddi_brightness_point *brightness_curve;
+	u8 num_brightness_points;
+	/* optional backlight level at probe, the maximum if unset */
+	u8 default_brightness;
 };
 
 struct tddi_ctx {
@@ -54,11 +67,27 @@ static inline struct tddi_ctx *to_tddi_ctx(struct drm_panel *panel)
 	return container_of(panel, struct tddi_ctx, panel);
 }
 
+static u8 tddi_dcs_brightness(const struct tddi_panel_data *data, u8 level)
+{
+	const struct tddi_brightness_point *p = data->brightness_curve;
+	unsigned int i;
+
+	if (!p || !level)
+		return level;
+
+	for (i = 1; i < data->num_brightness_points - 1 && level > p[i].level; i++)
+		;
+
+	return p[i - 1].dcs + (level - p[i - 1].level) * (p[i].dcs - p[i - 1].dcs) /
+			      (p[i].level - p[i - 1].level);
+}
+
 static int tddi_update_status(struct backlight_device *backlight)
 {
 	struct tddi_ctx *ctx = bl_get_data(backlight);
 	struct mipi_dsi_multi_context dsi = { .dsi = ctx->dsi };
-	u8 brightness = backlight_get_brightness(backlight);
+	u8 brightness = tddi_dcs_brightness(ctx->data,
+					    backlight_get_brightness(backlight));
 
 	if (!ctx->panel.enabled)
 		return 0;
@@ -112,7 +141,8 @@ static int tddi_enable(struct drm_panel *panel)
 {
 	struct tddi_ctx *ctx = to_tddi_ctx(panel);
 	struct mipi_dsi_multi_context dsi = { .dsi = ctx->dsi };
-	u8 brightness = ctx->backlight->props.brightness;
+	u8 brightness = tddi_dcs_brightness(ctx->data,
+					    ctx->backlight->props.brightness);
 
 	if (ctx->data->init)
 		ctx->data->init(&dsi);
@@ -158,12 +188,6 @@ static const struct backlight_ops tddi_bl_ops = {
 	.update_status = tddi_update_status,
 };
 
-static const struct backlight_properties tddi_bl_props = {
-	.type = BACKLIGHT_PLATFORM,
-	.brightness = 255,
-	.max_brightness = 255,
-};
-
 static const struct drm_panel_funcs tddi_drm_panel_funcs = {
 	.prepare = tddi_prepare,
 	.unprepare = tddi_unprepare,
@@ -175,6 +199,10 @@ static const struct drm_panel_funcs tddi_drm_panel_funcs = {
 static int tddi_probe(struct mipi_dsi_device *dsi)
 {
 	struct device *dev = &dsi->dev;
+	struct backlight_properties props = {
+		.type = BACKLIGHT_PLATFORM,
+		.max_brightness = 255,
+	};
 	struct tddi_ctx *ctx;
 	int ret;
 
@@ -207,9 +235,10 @@ static int tddi_probe(struct mipi_dsi_device *dsi)
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "failed to get panel timings\n");
 
+	props.brightness = ctx->data->default_brightness ?: props.max_brightness;
 	ctx->backlight = devm_backlight_device_register(dev, dev_name(dev), dev,
 							ctx, &tddi_bl_ops,
-							&tddi_bl_props);
+							&props);
 	if (IS_ERR(ctx->backlight))
 		return dev_err_probe(dev, PTR_ERR(ctx->backlight),
 				     "failed to register backlight device");
@@ -445,6 +474,13 @@ static void td4150_init(struct mipi_dsi_multi_context *dsi)
 	mipi_dsi_dcs_write_seq_multi(dsi, 0xb0, 0x03);
 }
 
+/* the vendor driver's curve, which keeps the top of the DCS range for HBM */
+static const struct tddi_brightness_point td4150_brightness_curve[] = {
+	{ .level = 1, .dcs = 2 },
+	{ .level = 128, .dcs = 77 },
+	{ .level = 255, .dcs = 210 },
+};
+
 static const struct tddi_panel_data td4150_panel_data = {
 	.lanes = 4,
 	/* the vendor driver sends the initialisation in LP mode */
@@ -456,6 +492,10 @@ static const struct tddi_panel_data td4150_panel_data = {
 	/* wait timings for panel disable */
 	.delay_ms_display_off = 17,
 	.delay_ms_sleep_enter = 68,
+	.brightness_curve = td4150_brightness_curve,
+	.num_brightness_points = ARRAY_SIZE(td4150_brightness_curve),
+	/* the vendor driver's default level */
+	.default_brightness = 128,
 };
 
 static const struct tddi_panel_data td4300_panel_data = {
