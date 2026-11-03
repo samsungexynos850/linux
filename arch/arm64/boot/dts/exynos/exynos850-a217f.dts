@@ -15,26 +15,8 @@
 	compatible = "samsung,a217f", "samsung,exynos850";
 
 	chosen {
-		ranges;
-		#address-cells = <2>;
-		#size-cells = <1>;
-
 		bootargs = "no_console_suspend mem_sleep_default=s2idle androidboot.hardware=exynos850 androidboot.boot_devices=soc@0/12100000.mmc androidboot.selinux=permissive androidboot.verifiedbootstate=orange androidboot.init_fatal_reboot_target=recovery firmware_class.path=/vendor/firmware/ log_buf_len=4M loop.max_part=7 rw";
 
-		framebuffer0: framebuffer@fa000000 {
-			compatible = "simple-framebuffer";
-			reg = <0x0 0xfa000000 (720 * 1600 * 4)>;
-			width = <720>;
-			height = <1600>;
-			stride = <(720 * 4)>;
-			format = "a8r8g8b8";
-			clocks = <&cmu_dpu CLK_GOUT_DPU_DECON0_ACLK>,
-				 <&cmu_dpu CLK_GOUT_DPU_DMA_ACLK>,
-				 <&cmu_dpu CLK_GOUT_DPU_DPP_ACLK>,
-				 <&cmu_dpu CLK_GOUT_DPU_PPMU_ACLK>,
-				 <&cmu_dpu CLK_GOUT_DPU_PPMU_PCLK>,
-				 <&cmu_dpu CLK_GOUT_DPU_SMMU_CLK>;
-		};
 	};
 
 	/*
@@ -115,6 +97,12 @@
 
 		cont_splash_mem: framebuffer@fa000000 {
 			reg = <0x0 0xfa000000 (720 * 1600 * 4)>;
+			/*
+			 * Boot splash of the bootloader. The DECON keeps
+			 * scanning it out until the first commit from userspace,
+			 * so it stays identity mapped behind the IOMMU.
+			 */
+			iommu-addresses = <&decon 0xfa000000 (720 * 1600 * 4)>;
 			no-map;
 		};
 	};
@@ -340,6 +328,7 @@
 };
 
 &decon {
+	memory-region = <&cont_splash_mem>;
 	status = "okay";
 };
 
