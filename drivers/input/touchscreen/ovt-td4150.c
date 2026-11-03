@@ -193,6 +193,15 @@ struct tcm_object_data {
 struct ovt_tcm_data {
 	struct spi_device *spi;
 	struct input_dev *input_dev;
+	/* re-initializes the controller after it reset by itself */
+	struct work_struct reset_work;
+	bool ready;
+	/*
+	 * CMD_ROMBOOT_DOWNLOAD payload, kept for later downloads: the image
+	 * may only be reachable early in boot, from an initramfs
+	 */
+	u8 *fw_payload;
+	unsigned int fw_payload_len;
 	struct touchscreen_properties props;
 	struct gpio_desc *reset_gpio;
 	const char *firmware_name;
@@ -352,6 +361,18 @@ static void ovt_tcm_dispatch_message(struct ovt_tcm_data *ts)
 
 		dev_dbg(&ts->spi->dev, "identify report, mode=0x%02x\n",
 			ts->id_info.mode);
+
+		/*
+		 * An identify report outside of a command means the controller
+		 * reset, for example because the display side of the chip was
+		 * powered down. It is back in its ROM bootloader without the
+		 * application firmware.
+		 */
+		if (ts->command_status != TCM_CMD_STATUS_BUSY && ts->ready) {
+			ts->ready = false;
+			schedule_work(&ts->reset_work);
+			return;
+		}
 
 		if (ts->command_status == TCM_CMD_STATUS_BUSY) {
 			if (ts->command == TCM_CMD_RESET ||
@@ -1052,16 +1073,16 @@ static int ovt_tcm_find_romboot_fw(struct device *dev, const u8 *image,
 	return -ENOENT;
 }
 
-static int ovt_tcm_romboot_download(struct ovt_tcm_data *ts)
+static int ovt_tcm_load_fw_payload(struct ovt_tcm_data *ts)
 {
 	const struct firmware *fw;
 	const u8 *fw_data;
 	unsigned int fw_len;
-	unsigned int out_len;
 	u8 *out;
-	u8 *resp;
-	unsigned int resp_len;
 	int ret;
+
+	if (ts->fw_payload)
+		return 0;
 
 	ret = request_firmware(&fw, ts->firmware_name, &ts->spi->dev);
 	if (ret) {
@@ -1078,8 +1099,7 @@ static int ovt_tcm_romboot_download(struct ovt_tcm_data *ts)
 		goto out_release;
 	}
 
-	out_len = TCM_FW_RESERVED_BYTES + fw_len;
-	out = kvzalloc(out_len, GFP_KERNEL);
+	out = kvzalloc(TCM_FW_RESERVED_BYTES + fw_len, GFP_KERNEL);
 	if (!out) {
 		ret = -ENOMEM;
 		goto out_release;
@@ -1091,14 +1111,33 @@ static int ovt_tcm_romboot_download(struct ovt_tcm_data *ts)
 	out[0] = (u8)(fw_len >> 16);
 	memcpy(out + TCM_FW_RESERVED_BYTES, fw_data, fw_len);
 
-	dev_info(&ts->spi->dev, "downloading %u byte application firmware\n", fw_len);
+	ts->fw_payload = out;
+	ts->fw_payload_len = TCM_FW_RESERVED_BYTES + fw_len;
 
-	ret = ovt_tcm_write_message(ts, TCM_CMD_ROMBOOT_DOWNLOAD, out, out_len,
+out_release:
+	release_firmware(fw);
+	return ret;
+}
+
+static int ovt_tcm_romboot_download(struct ovt_tcm_data *ts)
+{
+	u8 *resp;
+	unsigned int resp_len;
+	int ret;
+
+	ret = ovt_tcm_load_fw_payload(ts);
+	if (ret)
+		return ret;
+
+	dev_info(&ts->spi->dev, "downloading %u byte application firmware\n",
+		 ts->fw_payload_len - TCM_FW_RESERVED_BYTES);
+
+	ret = ovt_tcm_write_message(ts, TCM_CMD_ROMBOOT_DOWNLOAD,
+				    ts->fw_payload, ts->fw_payload_len,
 				    &resp, &resp_len);
-	kvfree(out);
 	if (ret) {
 		dev_err(&ts->spi->dev, "firmware download failed: %d\n", ret);
-		goto out_release;
+		return ret;
 	}
 
 	ret = ovt_tcm_write_message(ts, TCM_CMD_ROMBOOT_RUN_BOOTLOADER_FIRMWARE,
@@ -1106,15 +1145,12 @@ static int ovt_tcm_romboot_download(struct ovt_tcm_data *ts)
 	if (ret) {
 		dev_err(&ts->spi->dev,
 			"failed to run downloaded bootloader firmware: %d\n", ret);
-		goto out_release;
+		return ret;
 	}
 
 	msleep(TCM_MODE_SWITCH_DELAY_MS);
-	ret = 0;
 
-out_release:
-	release_firmware(fw);
-	return ret;
+	return 0;
 }
 
 static int ovt_tcm_init_device(struct ovt_tcm_data *ts)
@@ -1233,10 +1269,52 @@ static irqreturn_t ovt_tcm_irq_thread(int irq, void *data)
  * Probe / remove / power management
  */
 
+static void ovt_tcm_release_slots(struct ovt_tcm_data *ts)
+{
+	unsigned int i;
+
+	for (i = 0; i < ts->max_objects; i++) {
+		input_mt_slot(ts->input_dev, i);
+		input_mt_report_slot_inactive(ts->input_dev);
+	}
+	input_mt_sync_frame(ts->input_dev);
+	input_sync(ts->input_dev);
+}
+
+static void ovt_tcm_reset_work(struct work_struct *work)
+{
+	struct ovt_tcm_data *ts = container_of(work, struct ovt_tcm_data,
+					       reset_work);
+	int ret;
+
+	dev_info(&ts->spi->dev, "controller reset, reinitializing\n");
+
+	/* Touches in progress were lost with the reset */
+	if (ts->input_dev)
+		ovt_tcm_release_slots(ts);
+
+	ret = ovt_tcm_init_device(ts);
+	if (ret) {
+		dev_err(&ts->spi->dev, "failed to reinitialize controller: %d\n",
+			ret);
+		return;
+	}
+
+	ts->ready = true;
+}
+
+static void ovt_tcm_cancel_reset_work(void *data)
+{
+	struct ovt_tcm_data *ts = data;
+
+	cancel_work_sync(&ts->reset_work);
+}
+
 static void ovt_tcm_free_buffers(void *data)
 {
 	struct ovt_tcm_data *ts = data;
 
+	kvfree(ts->fw_payload);
 	kfree(ts->report_config);
 	kfree(ts->resp_buf);
 	kfree(ts->in_buf);
@@ -1308,6 +1386,12 @@ static int ovt_tcm_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
+	/* The interrupt schedules the work, so cancel it once that is gone */
+	INIT_WORK(&ts->reset_work, ovt_tcm_reset_work);
+	ret = devm_add_action_or_reset(dev, ovt_tcm_cancel_reset_work, ts);
+	if (ret)
+		return ret;
+
 	/* Responses to commands arrive through the interrupt too */
 	ret = devm_request_threaded_irq(dev, spi->irq, NULL, ovt_tcm_irq_thread,
 					IRQF_ONESHOT, "ovt-tcm", ts);
@@ -1327,6 +1411,8 @@ static int ovt_tcm_probe(struct spi_device *spi)
 		if (ret)
 			return dev_err_probe(dev, ret, "failed to init wakeup\n");
 	}
+
+	ts->ready = true;
 
 	return 0;
 }
@@ -1349,7 +1435,9 @@ static int ovt_tcm_suspend(struct device *dev)
 	if (ret)
 		dev_warn(dev, "failed to enter deep sleep: %d\n", ret);
 
+	ts->ready = false;
 	disable_irq(ts->spi->irq);
+	cancel_work_sync(&ts->reset_work);
 	ovt_tcm_power_off(ts);
 
 	return 0;
@@ -1381,6 +1469,8 @@ static int ovt_tcm_resume(struct device *dev)
 		dev_err(dev, "failed to reinitialize controller after resume: %d\n", ret);
 		return ret;
 	}
+
+	ts->ready = true;
 
 	return 0;
 }
