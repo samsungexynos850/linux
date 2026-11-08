@@ -18,6 +18,7 @@
 #include <linux/mfd/samsung/s2mpu02.h>
 #include <linux/mfd/samsung/s2mpu05.h>
 #include <linux/mfd/samsung/s2mu005.h>
+#include <linux/mfd/samsung/s2mu106.h>
 #include <linux/mfd/samsung/s5m8767.h>
 #include <linux/regmap.h>
 #include "sec-core.h"
@@ -320,6 +321,34 @@ static unsigned int s2mu005_irq_get_reg(struct regmap_irq_chip_data *data,
 	return base;
 }
 
+static const struct regmap_irq s2mu106_irqs[] = {
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_SYS, 0, BIT(0)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_CV, 0, BIT(1)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_FAULT, 0, BIT(2)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_RESTART, 0, BIT(3)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_DONE, 0, BIT(4)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_TOPOFF, 0, BIT(5)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_WCIN, 0, BIT(6)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_CHGIN, 0, BIT(7)),
+
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_ICR, 1, BIT(0)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_IVR, 1, BIT(1)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_AICL, 1, BIT(2)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_DET_BAT, 1, BIT(3)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_BAT, 1, BIT(4)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_BATN_OPEN, 1, BIT(5)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_BATP_OPEN, 1, BIT(6)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_QBAT_OFF, 1, BIT(7)),
+
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_BST, 2, BIT(0)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_TX, 2, BIT(1)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_OTG, 2, BIT(2)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_VBUS_SHORT, 2, BIT(3)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_MAX_DUTY, 2, BIT(4)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_PE_DONE, 2, BIT(5)),
+	REGMAP_IRQ_REG(S2MU106_IRQ_CHGR_BAT_CONTACT, 2, BIT(6)),
+};
+
 static const struct regmap_irq s5m8767_irqs[] = {
 	REGMAP_IRQ_REG(S5M8767_IRQ_PWRR, 0, S5M8767_IRQ_PWRR_MASK),
 	REGMAP_IRQ_REG(S5M8767_IRQ_PWRF, 0, S5M8767_IRQ_PWRF_MASK),
@@ -453,6 +482,16 @@ static const struct regmap_irq_chip s2mu005_irq_chip = {
 	.get_irq_reg = s2mu005_irq_get_reg,
 };
 
+/* Only the charger block is supported, its status registers clear on read */
+static const struct regmap_irq_chip s2mu106_irq_chip = {
+	.name = "s2mu106",
+	.irqs = s2mu106_irqs,
+	.num_irqs = ARRAY_SIZE(s2mu106_irqs),
+	.num_regs = 3,
+	.status_base = S2MU106_REG_CHGR_INT1,
+	.mask_base = S2MU106_REG_CHGR_INT1M,
+};
+
 static const struct regmap_irq_chip s5m8767_irq_chip = {
 	.name = "s5m8767",
 	.irqs = s5m8767_irqs,
@@ -565,6 +604,9 @@ struct regmap_irq_chip_data *sec_irq_init(struct sec_pmic_dev *sec_pmic)
 	case S2MU005:
 		sec_irq_chip = &s2mu005_irq_chip;
 		break;
+	case S2MU106:
+		sec_irq_chip = &s2mu106_irq_chip;
+		break;
 	default:
 		return dev_err_ptr_probe(sec_pmic->dev, -EINVAL, "Unsupported device type %d\n",
 					 sec_pmic->device_type);
@@ -574,6 +616,15 @@ struct regmap_irq_chip_data *sec_irq_init(struct sec_pmic_dev *sec_pmic)
 		dev_warn(sec_pmic->dev,
 			 "No interrupt specified, no interrupts\n");
 		return NULL;
+	}
+
+	if (sec_pmic->device_type == S2MU106) {
+		/* Route only the charger block to the interrupt line */
+		ret = regmap_write(sec_pmic->regmap_pmic, S2MU106_REG_IPINT_MASK,
+				   (u8)~S2MU106_IPINT_CHGR);
+		if (ret)
+			return dev_err_ptr_probe(sec_pmic->dev, ret,
+						 "Failed to unmask the charger interrupts\n");
 	}
 
 	ret = devm_regmap_add_irq_chip(sec_pmic->dev, sec_pmic->regmap_pmic,

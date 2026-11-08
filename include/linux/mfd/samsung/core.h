@@ -50,6 +50,7 @@ enum sec_device_type {
 	S2MPU02,
 	S2MPU05,
 	S2MU005,
+	S2MU106,
 };
 
 /**

@@ -17,6 +17,7 @@
 #include <linux/mfd/samsung/s2mps11.h>
 #include <linux/mfd/samsung/s2mps13.h>
 #include <linux/mfd/samsung/s2mu005.h>
+#include <linux/mfd/samsung/s2mu106.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/pm.h>
@@ -122,6 +123,16 @@ static const struct mfd_cell s2mu005_devs[] = {
 	MFD_CELL_OF("s2mu005-rgb", NULL, NULL, 0, 0, "samsung,s2mu005-rgb"),
 };
 
+static const struct resource s2mu106_chgr_resources[] = {
+	DEFINE_RES_IRQ_NAMED(S2MU106_IRQ_CHGR_CHGIN, "chgin"),
+	DEFINE_RES_IRQ_NAMED(S2MU106_IRQ_CHGR_DONE, "done"),
+	DEFINE_RES_IRQ_NAMED(S2MU106_IRQ_CHGR_FAULT, "fault"),
+};
+
+static const struct mfd_cell s2mu106_devs[] = {
+	MFD_CELL_RES("s2mu106-charger", s2mu106_chgr_resources),
+};
+
 static const struct resource s2mpu12_pwrkey_resources[] = {
 	DEFINE_RES_IRQ_NAMED(S2MPU12_IRQ_PWRONR, "pwronr"),
 	DEFINE_RES_IRQ_NAMED(S2MPU12_IRQ_PWRONF, "pwronf"),
@@ -150,6 +161,10 @@ static void sec_pmic_dump_rev(struct sec_pmic_dev *sec_pmic)
 	case S2MU005:
 		reg = S2MU005_REG_ID;
 		mask = S2MU005_ID_MASK;
+		break;
+	case S2MU106:
+		reg = S2MU106_REG_ID;
+		mask = S2MU106_ID_MASK;
 		break;
 	default:
 		/* For other device types, REG_ID is always the first register. */
@@ -302,6 +317,10 @@ int sec_pmic_probe(struct device *dev, int device_type, unsigned int irq,
 	case S2MU005:
 		sec_devs = s2mu005_devs;
 		num_sec_devs = ARRAY_SIZE(s2mu005_devs);
+		break;
+	case S2MU106:
+		sec_devs = s2mu106_devs;
+		num_sec_devs = ARRAY_SIZE(s2mu106_devs);
 		break;
 	default:
 		return dev_err_probe(sec_pmic->dev, -EINVAL,
