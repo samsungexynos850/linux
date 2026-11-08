@@ -39,9 +39,11 @@ properties:
     minItems: 1
     maxItems: 9
     description:
-      List of the underlying clocks associated with each ACPM clock domain.
-      This property relates to ACPM firmware variants where not all clock
-      operations are implemented.
+      The clocks that each ACPM clock domain drives, as seen by the clock
+      controller. This property relates to ACPM firmware variants that
+      can't report the clock rates. They give the rate the bootloader left
+      each domain at, and are only read until the domain's rate is first
+      set through ACPM.
 
   clock-names:
     minItems: 1

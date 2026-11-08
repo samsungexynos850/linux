@@ -392,8 +392,8 @@
 			compatible = "samsung,exynos850-acpm-ipc";
 			mboxes = <&ap2apm_mailbox>;
 			shmem = <&apm_sram>;
-			clocks = <&cmu_cpucl0 CLK_FOUT_CPUCL0_PLL>,
-				 <&cmu_cpucl1 CLK_FOUT_CPUCL1_PLL>;
+			clocks = <&cmu_cpucl0 CLK_GOUT_CLUSTER0_SCLK>,
+				 <&cmu_cpucl1 CLK_GOUT_CLUSTER1_SCLK>;
 			clock-names = "cpucl0", "cpucl1";
 			#clock-cells = <1>;
 		};
