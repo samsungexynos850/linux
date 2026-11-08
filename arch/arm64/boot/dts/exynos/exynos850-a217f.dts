@@ -24,6 +24,7 @@
 		device-chemistry = "lithium-ion-polymer";
 		charge-full-design-microamp-hours = <5000000>;
 		voltage-max-design-microvolt = <4350000>;
+		alert-celsius = <0 50>;
 	};
 
 	/*
@@ -325,6 +326,13 @@
 	};
 };
 
+&adc {
+	/* TODO: the analog supply is an always-on PMIC rail */
+	vdd-supply = <&reg_dummy>;
+
+	status = "okay";
+};
+
 &cmu_hsi {
 	clocks = <&oscclk>, <&rtcclk>,
 		 <&cmu_top CLK_DOUT_HSI_BUS>,
@@ -407,6 +415,33 @@
 
 		monitored-battery = <&battery>;
 		shunt-resistor-micro-ohms = <5000>;
+
+		io-channels = <&adc 1>;
+		io-channel-names = "temp";
+		samsung,temp-lookup-table =
+			<90000 311>,
+			<85000 349>,
+			<80000 403>,
+			<75000 478>,
+			<70000 565>,
+			<65000 670>,
+			<60000 781>,
+			<55000 910>,
+			<50000 1047>,
+			<45000 1220>,
+			<40000 1382>,
+			<35000 1615>,
+			<30000 1841>,
+			<25000 2059>,
+			<20000 2285>,
+			<15000 2499>,
+			<10000 2747>,
+			<5000 2950>,
+			<0 3159>,
+			<(-5000) 3307>,
+			<(-10000) 3475>,
+			<(-15000) 3604>,
+			<(-20000) 3690>;
 
 		/* Samsung SDI model, first age step of the downstream data */
 		samsung,battery-capacity = /bits/ 8 <0xc4 0x49 0xc0 0x0e>;
