@@ -385,6 +385,16 @@
 &i2c_0 {
 	status = "okay";
 
+	pmic@3d {
+		compatible = "samsung,s2mu106-pmic";
+		reg = <0x3d>;
+		pinctrl-0 = <&if_pmic_irq>;
+		pinctrl-names = "default";
+
+		interrupt-parent = <&gpa2>;
+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+	};
+
 	fuel-gauge@3b {
 		compatible = "samsung,s2mu106-fuel-gauge";
 		reg = <0x3b>;
@@ -496,6 +506,12 @@
 };
 
 &pinctrl_alive {
+	if_pmic_irq: if-pmic-irq-pins {
+		samsung,pins = "gpa2-5";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+	};
+
 	fg_alert: fg-alert-pins {
 		samsung,pins = "gpa3-0";
 		samsung,pin-function = <EXYNOS_PIN_FUNC_EINT>;
