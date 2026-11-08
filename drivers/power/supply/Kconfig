@@ -240,6 +240,17 @@ config BATTERY_S2MU005
 
 	  This driver, if built as a module, will be called s2mu005-fuel-gauge.
 
+config BATTERY_S2MU106
+	tristate "Samsung S2MU106 PMIC fuel gauge driver"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y to enable support for the fuel gauge integrated in the
+	  Samsung S2MU106 PMIC, used in phones such as the Galaxy A21s.
+	  It reports battery voltage, current, state of charge and capacity.
+
+	  This driver, if built as a module, will be called s2mu106-battery.
+
 config BATTERY_COLLIE
 	tristate "Sharp SL-5500 (collie) battery"
 	depends on SA1100_COLLIE && MCP_UCB1200
