@@ -31,6 +31,24 @@ properties:
 
   wakeup-source: true
 
+  io-channels:
+    description: ADC channel connected to the battery thermistor.
+    maxItems: 1
+
+  io-channel-names:
+    const: temp
+
+  samsung,temp-lookup-table:
+    $ref: /schemas/types.yaml#/definitions/int32-matrix
+    description:
+      Battery thermistor lookup table, as pairs of temperature (in
+      millidegrees Celsius) and ADC value, sorted by ascending ADC value.
+    minItems: 2
+    items:
+      items:
+        - description: Temperature in millidegrees Celsius
+        - description: ADC value
+
   shunt-resistor-micro-ohms:
     description:
       Value of the current sense resistor. The factory trim of the gauge
@@ -54,6 +72,7 @@ properties:
     maxItems: 110
 
 dependencies:
+  io-channels: [ 'io-channel-names', 'samsung,temp-lookup-table' ]
   samsung,battery-capacity: [ 'samsung,battery-model' ]
   samsung,battery-model: [ 'samsung,battery-capacity' ]
 
