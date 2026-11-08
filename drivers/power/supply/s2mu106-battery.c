@@ -11,6 +11,7 @@
 #include <linux/delay.h>
 #include <linux/device-id/of.h>
 #include <linux/i2c.h>
+#include <linux/iio/consumer.h>
 #include <linux/interrupt.h>
 #include <linux/minmax.h>
 #include <linux/module.h>
@@ -84,12 +85,22 @@
 
 #define S2MU106_FG_SHUNT_DEFAULT_UOHM	10000
 
+/* Battery thermistor ADC reading at a given temperature */
+struct s2mu106_fg_temp_point {
+	int temp;	/* millidegrees Celsius */
+	int adc;
+};
+
 struct s2mu106_fg {
 	struct device *dev;
 	struct regmap *regmap;
 	struct power_supply *psy;
 	/* Serializes MONOUTSEL selection and MONOUT readback */
 	struct mutex monout_lock;
+
+	struct iio_channel *temp_chan;
+	struct s2mu106_fg_temp_point *temp_table;
+	unsigned int temp_table_len;
 };
 
 static const struct regmap_config s2mu106_fg_regmap_config = {
@@ -273,6 +284,80 @@ static int s2mu106_fg_get_cycle_count(struct s2mu106_fg *fg, int *cycles)
 	return 0;
 }
 
+/* The ADC value rises as the temperature falls, interpolate between points */
+static int s2mu106_fg_adc_to_temp(struct s2mu106_fg *fg, int adc)
+{
+	const struct s2mu106_fg_temp_point *t = fg->temp_table;
+	unsigned int n = fg->temp_table_len;
+	unsigned int i;
+
+	if (adc <= t[0].adc)
+		return t[0].temp;
+
+	if (adc >= t[n - 1].adc)
+		return t[n - 1].temp;
+
+	for (i = 1; adc > t[i].adc; i++)
+		;
+
+	return t[i - 1].temp + (t[i].temp - t[i - 1].temp) *
+	       (adc - t[i - 1].adc) / (t[i].adc - t[i - 1].adc);
+}
+
+static int s2mu106_fg_get_temp(struct s2mu106_fg *fg, int *decicelsius)
+{
+	int adc, ret;
+
+	if (!fg->temp_chan)
+		return -ENODATA;
+
+	ret = iio_read_channel_raw(fg->temp_chan, &adc);
+	if (ret < 0) {
+		dev_err(fg->dev, "failed to read the battery thermistor (%d)\n", ret);
+		return ret;
+	}
+
+	*decicelsius = s2mu106_fg_adc_to_temp(fg, adc) / 100;
+
+	return 0;
+}
+
+static int s2mu106_fg_get_health(struct s2mu106_fg *fg, int *health)
+{
+	struct power_supply_battery_info *info = fg->psy->battery_info;
+	int temp, uv, ret;
+
+	*health = POWER_SUPPLY_HEALTH_GOOD;
+
+	if (!info)
+		return 0;
+
+	if (info->overvoltage_limit_uv > 0) {
+		ret = s2mu106_fg_get_voltage_now(fg, &uv);
+		if (ret)
+			return ret;
+
+		if (uv > info->overvoltage_limit_uv) {
+			*health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+			return 0;
+		}
+	}
+
+	if (!fg->temp_chan)
+		return 0;
+
+	ret = s2mu106_fg_get_temp(fg, &temp);
+	if (ret)
+		return ret;
+
+	if (info->temp_alert_max < INT_MAX && temp >= info->temp_alert_max * 10)
+		*health = POWER_SUPPLY_HEALTH_OVERHEAT;
+	else if (info->temp_alert_min > INT_MIN && temp <= info->temp_alert_min * 10)
+		*health = POWER_SUPPLY_HEALTH_COLD;
+
+	return 0;
+}
+
 static int s2mu106_fg_get_status(struct s2mu106_fg *fg, int *status)
 {
 	int current_now, current_avg, capacity;
@@ -305,6 +390,8 @@ static int s2mu106_fg_get_status(struct s2mu106_fg *fg, int *status)
 
 static const enum power_supply_property s2mu106_fg_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_VOLTAGE_AVG,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
@@ -324,6 +411,10 @@ static int s2mu106_fg_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		return s2mu106_fg_get_status(fg, &val->intval);
+	case POWER_SUPPLY_PROP_HEALTH:
+		return s2mu106_fg_get_health(fg, &val->intval);
+	case POWER_SUPPLY_PROP_TEMP:
+		return s2mu106_fg_get_temp(fg, &val->intval);
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		return s2mu106_fg_get_voltage_now(fg, &val->intval);
 	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
@@ -577,6 +668,54 @@ static int s2mu106_fg_init(struct s2mu106_fg *fg)
 				  S2MU106_FG_IRQ_MASK_INIT);
 }
 
+/* The battery thermistor is optional, it is read through an external ADC */
+static int s2mu106_fg_init_temp(struct s2mu106_fg *fg)
+{
+	struct device *dev = fg->dev;
+	unsigned int i;
+	u32 *raw;
+	int n, ret;
+
+	fg->temp_chan = devm_iio_channel_get(dev, "temp");
+	if (IS_ERR(fg->temp_chan)) {
+		ret = PTR_ERR(fg->temp_chan);
+		fg->temp_chan = NULL;
+		if (ret == -ENODEV)
+			return 0;
+
+		return dev_err_probe(dev, ret, "failed to get the temperature channel\n");
+	}
+
+	n = device_property_count_u32(dev, "samsung,temp-lookup-table");
+	if (n < 4 || n % 2)
+		return dev_err_probe(dev, -EINVAL, "invalid temperature lookup table\n");
+
+	raw = devm_kcalloc(dev, n, sizeof(*raw), GFP_KERNEL);
+	fg->temp_table = devm_kcalloc(dev, n / 2, sizeof(*fg->temp_table),
+				      GFP_KERNEL);
+	if (!raw || !fg->temp_table)
+		return -ENOMEM;
+
+	ret = device_property_read_u32_array(dev, "samsung,temp-lookup-table",
+					     raw, n);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to read temperature lookup table\n");
+
+	fg->temp_table_len = n / 2;
+	for (i = 0; i < fg->temp_table_len; i++) {
+		fg->temp_table[i].temp = (s32)raw[2 * i];
+		fg->temp_table[i].adc = raw[2 * i + 1];
+
+		if (i && fg->temp_table[i].adc <= fg->temp_table[i - 1].adc)
+			return dev_err_probe(dev, -EINVAL,
+					     "temperature lookup table not sorted by ADC value\n");
+	}
+
+	devm_kfree(dev, raw);
+
+	return 0;
+}
+
 static int s2mu106_fg_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
@@ -598,6 +737,10 @@ static int s2mu106_fg_probe(struct i2c_client *client)
 	if (IS_ERR(fg->regmap))
 		return dev_err_probe(dev, PTR_ERR(fg->regmap),
 				     "failed to initialize regmap\n");
+
+	ret = s2mu106_fg_init_temp(fg);
+	if (ret)
+		return ret;
 
 	ret = s2mu106_fg_init(fg);
 	if (ret)
