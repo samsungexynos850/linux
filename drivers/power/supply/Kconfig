@@ -881,9 +881,9 @@ config CHARGER_S2M
 	depends on MFD_SEC_CORE
 	help
 	  This option enables support for charger devices found in
-	  certain Samsung S2M series PMICs, such as the S2MU005. These
-	  devices provide USB power supply information and also required
-	  for USB OTG role switching.
+	  certain Samsung S2M series PMICs, such as the S2MU005 and S2MU106.
+	  These devices provide USB power supply information and are also
+	  required for USB OTG role switching on the S2MU005.
 
 config CHARGER_SGM41542
 	tristate "SGM41542 charger driver"

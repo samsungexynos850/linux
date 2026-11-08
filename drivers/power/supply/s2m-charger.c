@@ -7,10 +7,13 @@
  * Copyright (c) 2026 Łukasz Lebiedziński <kernel@lvkasz.us>
  */
 
+#include <linux/bitfield.h>
 #include <linux/devm-helpers.h>
 #include <linux/extcon.h>
+#include <linux/interrupt.h>
 #include <linux/mfd/samsung/core.h>
 #include <linux/mfd/samsung/s2mu005.h>
+#include <linux/mfd/samsung/s2mu106.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_graph.h>
@@ -224,6 +227,136 @@ static const struct power_supply_desc s2mu005_chgr_psy_desc = {
 		     BIT(POWER_SUPPLY_USB_TYPE_UNKNOWN),
 };
 
+static int s2mu106_chgr_get_online(struct s2m_chgr *priv, int *value)
+{
+	u32 val;
+	int ret;
+
+	ret = regmap_read(priv->regmap, S2MU106_REG_CHGR_STATUS0, &val);
+	if (ret) {
+		dev_err(priv->dev, "failed to read register (%d)\n", ret);
+		return ret;
+	}
+
+	switch (FIELD_GET(S2MU106_CHGR_CHGIN_STATUS, val)) {
+	case S2MU106_CHGR_IN_STATUS_VALID:
+	case S2MU106_CHGR_IN_STATUS_VALID2:
+		*value = 1;
+		break;
+	default:
+		*value = 0;
+	}
+
+	return 0;
+}
+
+static int s2mu106_chgr_get_health(struct s2m_chgr *priv, int *value)
+{
+	u32 val;
+	int ret;
+
+	ret = regmap_read(priv->regmap, S2MU106_REG_CHGR_STATUS1, &val);
+	if (ret) {
+		dev_err(priv->dev, "failed to read register (%d)\n", ret);
+		return ret;
+	}
+
+	switch (FIELD_GET(S2MU106_CHGR_FAULT_STATUS, val)) {
+	case S2MU106_CHGR_FAULT_NORMAL:
+		*value = POWER_SUPPLY_HEALTH_GOOD;
+		break;
+	case S2MU106_CHGR_FAULT_WD_SUSPEND:
+	case S2MU106_CHGR_FAULT_WD_RESET:
+		*value = POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE;
+		break;
+	case S2MU106_CHGR_FAULT_TSD:
+		*value = POWER_SUPPLY_HEALTH_OVERHEAT;
+		break;
+	case S2MU106_CHGR_FAULT_PRECHG_TMO:
+	case S2MU106_CHGR_FAULT_FASTCHG_TMO:
+		*value = POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE;
+		break;
+	default:
+		*value = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+	}
+
+	return 0;
+}
+
+static int s2mu106_chgr_get_property(struct power_supply *psy,
+				     enum power_supply_property psp,
+				     union power_supply_propval *val)
+{
+	struct s2m_chgr *priv = power_supply_get_drvdata(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		return s2mu106_chgr_get_online(priv, &val->intval);
+	case POWER_SUPPLY_PROP_HEALTH:
+		return s2mu106_chgr_get_health(priv, &val->intval);
+	default:
+		return -EINVAL;
+	}
+}
+
+static const enum power_supply_property s2mu106_chgr_properties[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_HEALTH,
+};
+
+static const struct power_supply_desc s2mu106_chgr_psy_desc = {
+	.name = "s2mu106-charger",
+	.type = POWER_SUPPLY_TYPE_USB,
+	.properties = s2mu106_chgr_properties,
+	.num_properties = ARRAY_SIZE(s2mu106_chgr_properties),
+	.get_property = s2mu106_chgr_get_property,
+};
+
+static irqreturn_t s2mu106_chgr_irq(int irq, void *data)
+{
+	struct s2m_chgr *priv = data;
+
+	power_supply_changed(priv->psy);
+
+	return IRQ_HANDLED;
+}
+
+/*
+ * There is no MUIC driver for the S2MU106, so only report the charger input
+ * state. The charger keeps running with the bootloader configuration.
+ */
+static int s2mu106_chgr_probe(struct s2m_chgr *priv,
+			      struct platform_device *pdev)
+{
+	static const char * const irq_names[] = { "chgin", "done", "fault" };
+	struct device *dev = priv->dev;
+	struct power_supply_config psy_cfg = {};
+	unsigned int i;
+	int irq, ret;
+
+	psy_cfg.drv_data = priv;
+	psy_cfg.fwnode = dev_fwnode(dev->parent);
+	priv->psy = devm_power_supply_register(dev, &s2mu106_chgr_psy_desc,
+					       &psy_cfg);
+	if (IS_ERR(priv->psy))
+		return dev_err_probe(dev, PTR_ERR(priv->psy),
+				     "failed to register power supply subsystem\n");
+
+	for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
+		irq = platform_get_irq_byname(pdev, irq_names[i]);
+		if (irq < 0)
+			return irq;
+
+		ret = devm_request_threaded_irq(dev, irq, NULL, s2mu106_chgr_irq,
+						IRQF_ONESHOT, irq_names[i], priv);
+		if (ret)
+			return dev_err_probe(dev, ret, "failed to request %s IRQ\n",
+					     irq_names[i]);
+	}
+
+	return 0;
+}
+
 static int s2m_chgr_extcon_notifier(struct notifier_block *nb,
 					unsigned long event, void *param)
 {
@@ -258,6 +391,8 @@ static int s2m_chgr_probe(struct platform_device *pdev)
 		psy_desc = &s2mu005_chgr_psy_desc;
 		extcon_work_func = s2mu005_chgr_extcon_work;
 		break;
+	case S2MU106:
+		return s2mu106_chgr_probe(priv, pdev);
 	default:
 		return dev_err_probe(dev, -ENODEV,
 				     "device type %d is not supported by driver\n",
@@ -294,6 +429,7 @@ static int s2m_chgr_probe(struct platform_device *pdev)
 
 static const struct platform_device_id s2m_chgr_id_table[] = {
 	{ "s2mu005-charger", S2MU005 },
+	{ "s2mu106-charger", S2MU106 },
 	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(platform, s2m_chgr_id_table);
