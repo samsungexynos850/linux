@@ -15,7 +15,7 @@
 	compatible = "samsung,a217f", "samsung,exynos850";
 
 	chosen {
-		bootargs = "no_console_suspend mem_sleep_default=s2idle androidboot.hardware=exynos850 androidboot.boot_devices=soc@0/12100000.mmc androidboot.selinux=permissive androidboot.verifiedbootstate=orange androidboot.init_fatal_reboot_target=recovery firmware_class.path=/vendor/firmware/ log_buf_len=4M loop.max_part=7 rw";
+		bootargs = "no_console_suspend mem_sleep_default=s2idle androidboot.hardware=exynos850 androidboot.boot_devices=soc@0/12100000.mmc androidboot.selinux=permissive androidboot.verifiedbootstate=orange androidboot.init_fatal_reboot_target=recovery firmware_class.path=/vendor/firmware/ clk_ignore_unused loop.max_part=7 rw";
 
 	};
 
